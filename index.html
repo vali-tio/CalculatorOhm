@@ -1,29 +1,19 @@
 <!DOCTYPE html>
 <html lang="id">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Jadwal Pelajaran</title>
-   <link rel="manifest" href="manifest.webmanifest">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Kalkulator Resistor</title>
+<link rel="manifest" href="manifest.webmanifest">
   <style>
-    body { font-family: Arial, sans-serif; margin: 0; padding: 20px; background: #f4f4f9; color: #333; transition: background 0.3s, color 0.3s; }
-    .dark { background: #1e1e1e; color: #f4f4f9; }
-    .container { max-width: 600px; margin: auto; }
-    select, input, button, textarea { padding: 8px; margin: 5px 0; border-radius: 6px; border: 1px solid #ccc; background: inherit; color: inherit; }
-    button { cursor: pointer; }
-    .btn { margin: 2px; padding: 6px 12px; border: none; border-radius: 6px; }
-    .btn-green { background: #28a745; color: #fff; }
-    .btn-blue { background: #007bff; color: #fff; }
-    .btn-red { background: #dc3545; color: #fff; }
-    .btn-yellow { background: #ffc107; color: #000; }
-    table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-    th, td { border: 1px solid #ccc; padding: 8px; text-align: center; }
-    th { background: #eee; }
-    .dark th { background: #333; }
-    .dark td, .dark th { border-color: #555; }
-    textarea { width: 100%; min-height: 80px; margin-top: 10px; resize: vertical; box-sizing: border-box; }
-    tr.dragging { opacity: 0.5; }
-  </style>
+  body {font-family: Arial, sans-serif; background:#0f172a; color:#f1f5f9; padding:20px}
+  h1 {color:#38bdf8; font-size:22px}
+  .card {background:#1e293b; padding:16px; border-radius:12px; margin-bottom:16px}
+  label {display:block; margin:6px 0}
+  select, input {padding:6px; border-radius:6px; border:1px solid #475569; margin:4px 0; background:#0f172a; color:#f1f5f9}
+  button {padding:8px 14px; margin-top:8px; border:none; border-radius:8px; background:#38bdf8; color:#0f172a; font-weight:600; cursor:pointer}
+  .result {margin-top:12px; padding:10px; background:#0f172a; border-radius:8px;}
+</style>
 </head>
 <footer id="donateFooter">
   <span>Gratis untuk semua</span>
@@ -59,173 +49,132 @@
 </style>
 
 <body>
-<div class="container">
-  <h2>Jadwal</h2>
-  <div>
-    <label>Pilih Hari:</label>
-    <select id="daySelect"></select>
-    <button class="btn btn-green" onclick="addDay()">+ Hari</button>
-    <button class="btn btn-red" onclick="removeDay()">- Hari</button>
-  </div>
-  <div>
-    <input type="text" id="subjectInput" placeholder="Tambah mata pelajaran...">
-    <button class="btn btn-green" onclick="addSubject()">+ Tambah</button>
-  </div>
-  <div>
-    <button class="btn btn-blue" onclick="saveData()">Simpan</button>
-    <button class="btn btn-green" onclick="importData()">Import</button>
-    <button class="btn btn-green" onclick="backupData()">Backup</button>
-    <button class="btn btn-yellow" onclick="toggleDarkMode()">🌙/☀️</button>
-  </div>
+<h1>Kalkulator Resistor</h1>
 
-  <table id="scheduleTable">
-    <thead>
-      <tr><th>No</th><th>Mata Pelajaran</th><th>Aksi</th></tr>
-    </thead>
-    <tbody></tbody>
-  </table>
+<div class="card">
+  <h2>Resistor Karbon (Warna Gelang)</h2>
+  <label>Jumlah gelang:
+    <select id="gelangCount">
+      <option value="4">4</option>
+      <option value="5">5</option>
+      <option value="6">6</option>
+    </select>
+  </label>
+  <div id="warnaInputs"></div>
+  <button onclick="hitungResistorWarna()">Hitung</button>
+  <div class="result" id="hasilWarna"></div>
+</div>
 
-  <div>
-    <h3>Catatan:</h3>
-    <textarea id="notes" placeholder="Tulis catatan di sini..."></textarea>
-  </div>
+<div class="card">
+  <h2>Resistor SMD (Kode)</h2>
+  <label>Kode Resistor:
+    <input type="text" id="kodeSMD" placeholder="contoh: 103, 472, 4R7">
+  </label>
+  <button onclick="hitungResistorSMD()">Hitung</button>
+  <div class="result" id="hasilSMD"></div>
 </div>
 
 <script>
-  let data = JSON.parse(localStorage.getItem('jadwalData')) || { days: { 'Senin': [], }, notes: {} };
-  const daySelect = document.getElementById('daySelect');
-  const subjectInput = document.getElementById('subjectInput');
-  const scheduleTable = document.getElementById('scheduleTable').querySelector('tbody');
-  const notes = document.getElementById('notes');
-  let dragSrcEl = null;
+const warnaMap = {
+  hitam:{val:0, mult:1, tol:null},
+  coklat:{val:1, mult:10, tol:1},
+  merah:{val:2, mult:100, tol:2},
+  oranye:{val:3, mult:1000, tol:null},
+  kuning:{val:4, mult:10000, tol:null},
+  hijau:{val:5, mult:100000, tol:0.5},
+  biru:{val:6, mult:1000000, tol:0.25},
+  ungu:{val:7, mult:10000000, tol:0.1},
+  abu:{val:8, mult:100000000, tol:0.05},
+  putih:{val:9, mult:1000000000, tol:null},
+  emas:{val:null, mult:0.1, tol:5},
+  perak:{val:null, mult:0.01, tol:10},
+  none:{val:null, mult:null, tol:20}
+};
 
-  function renderDays(){
-    daySelect.innerHTML = '';
-    for (let d in data.days){
-      let opt = document.createElement('option');
-      opt.value = d; opt.textContent = d;
-      daySelect.appendChild(opt);
+const warnaList = Object.keys(warnaMap);
+
+function buatInputWarna(jumlah){
+  let html="";
+  for(let i=1;i<=jumlah;i++){
+    html+=`<label>Gelang ${i}: <select id="gelang${i}">`;
+    for(let w of warnaList){
+      html+=`<option value="${w}">${w}</option>`;
     }
-    renderSchedule();
+    html+="</select></label>";
   }
+  document.getElementById('warnaInputs').innerHTML=html;
+}
 
-  function addDay(){
-    let name = prompt('Nama hari:');
-    if(name && !data.days[name]){ data.days[name] = []; renderDays(); saveData(); }
+// inisialisasi default 4 gelang
+buatInputWarna(4);
+
+document.getElementById('gelangCount').addEventListener('change', e=>{
+  buatInputWarna(parseInt(e.target.value));
+});
+
+function formatOhm(val){
+  if(val>=1e6) return (val/1e6).toFixed(2)+" MΩ";
+  if(val>=1e3) return (val/1e3).toFixed(2)+" kΩ";
+  return val+" Ω";
+}
+
+function hitungResistorWarna(){
+  const jumlah=parseInt(document.getElementById('gelangCount').value);
+  let gelang=[];
+  for(let i=1;i<=jumlah;i++){
+    gelang.push(document.getElementById('gelang'+i).value);
   }
-
-  function removeDay(){
-    let d = daySelect.value;
-    if(confirm('Hapus hari ' + d + '?')){
-      delete data.days[d];
-      delete data.notes[d];
-      renderDays(); saveData();
-    }
+  let nilai=0; let tol="";
+  if(jumlah===4){
+    const d1=warnaMap[gelang[0]].val;
+    const d2=warnaMap[gelang[1]].val;
+    const mult=warnaMap[gelang[2]].mult;
+    tol=warnaMap[gelang[3]].tol;
+    nilai=(d1*10+d2)*mult;
   }
-
-  function addSubject(){
-    let d = daySelect.value;
-    let subj = subjectInput.value.trim();
-    if(subj){
-      data.days[d].push(subj);
-      subjectInput.value = '';
-      renderSchedule(); saveData();
-    }
+  if(jumlah===5){
+    const d1=warnaMap[gelang[0]].val;
+    const d2=warnaMap[gelang[1]].val;
+    const d3=warnaMap[gelang[2]].val;
+    const mult=warnaMap[gelang[3]].mult;
+    tol=warnaMap[gelang[4]].tol;
+    nilai=(d1*100+d2*10+d3)*mult;
   }
-
-  function removeSubject(index){
-    let d = daySelect.value;
-    data.days[d].splice(index,1);
-    renderSchedule(); saveData();
+  if(jumlah===6){
+    const d1=warnaMap[gelang[0]].val;
+    const d2=warnaMap[gelang[1]].val;
+    const d3=warnaMap[gelang[2]].val;
+    const mult=warnaMap[gelang[3]].mult;
+    tol=warnaMap[gelang[4]].tol;
+    nilai=(d1*100+d2*10+d3)*mult;
   }
+  document.getElementById('hasilWarna').innerText="Nilai: "+formatOhm(nilai)+ (tol?" ±"+tol+"%":"");
+}
 
-  function editSubject(index){
-    let d = daySelect.value;
-    let cell = document.getElementById('subj-'+index);
-    cell.contentEditable = true;
-    cell.focus();
-    cell.onblur = function(){
-      data.days[d][index] = cell.textContent.trim();
-      cell.contentEditable = false;
-      saveData();
-    };
+function hitungResistorSMD(){
+  let kode=document.getElementById('kodeSMD').value.trim().toUpperCase();
+  let nilai=null;
+  if(kode.includes('R')){
+    nilai=parseFloat(kode.replace('R','.'));
+  }else if(kode.length===3){
+    let d1=parseInt(kode[0]);
+    let d2=parseInt(kode[1]);
+    let mult=Math.pow(10,parseInt(kode[2]));
+    nilai=(d1*10+d2)*mult;
+  }else if(kode.length===4){
+    let d1=parseInt(kode[0]);
+    let d2=parseInt(kode[1]);
+    let d3=parseInt(kode[2]);
+    let mult=Math.pow(10,parseInt(kode[3]));
+    nilai=(d1*100+d2*10+d3)*mult;
   }
-
-  function renderSchedule(){
-    let d = daySelect.value;
-    scheduleTable.innerHTML = '';
-    data.days[d].forEach((subj,i)=>{
-      let tr = document.createElement('tr');
-      tr.setAttribute('draggable','true');
-      tr.innerHTML = `<td>${i+1}</td>
-                      <td id="subj-${i}">${subj}</td>
-                      <td>
-                        <button class='btn btn-blue' onclick='editSubject(${i})'>✏️</button>
-                        <button class='btn btn-red' onclick='removeSubject(${i})'>🗑️</button>
-                      </td>`;
-      addDnDHandlers(tr, i);
-      scheduleTable.appendChild(tr);
-    });
-    notes.value = data.notes[d] || '';
+  if(nilai!==null){
+    document.getElementById('hasilSMD').innerText="Nilai: "+formatOhm(nilai);
+  }else{
+    document.getElementById('hasilSMD').innerText="Kode tidak valid";
   }
-
-  function saveData(){
-    let d = daySelect.value;
-    data.notes[d] = notes.value;
-    localStorage.setItem('jadwalData', JSON.stringify(data));
-    alert('Data disimpan!');
-  }
-
-  function backupData(){
-    let blob = new Blob([JSON.stringify(data)], {type:'application/json'});
-    let a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = 'jadwal.json';
-    a.click();
-  }
-
-  function importData(){
-    let inp = document.createElement('input');
-    inp.type = 'file';
-    inp.accept = 'application/json';
-    inp.onchange = e=>{
-      let file = e.target.files[0];
-      let reader = new FileReader();
-      reader.onload = ()=>{ data = JSON.parse(reader.result); renderDays(); saveData(); };
-      reader.readAsText(file);
-    };
-    inp.click();
-  }
-
-  function toggleDarkMode(){
-    document.body.classList.toggle('dark');
-  }
-
-  function addDnDHandlers(row, index){
-    row.addEventListener('dragstart', (e)=>{
-      dragSrcEl = index;
-      row.classList.add('dragging');
-    });
-    row.addEventListener('dragend', ()=>{
-      row.classList.remove('dragging');
-    });
-    row.addEventListener('dragover', (e)=>{
-      e.preventDefault();
-    });
-    row.addEventListener('drop', (e)=>{
-      let d = daySelect.value;
-      let rows = Array.from(scheduleTable.querySelectorAll('tr'));
-      let dropIndex = rows.indexOf(row);
-      let moved = data.days[d].splice(dragSrcEl,1)[0];
-      data.days[d].splice(dropIndex,0,moved);
-      renderSchedule(); saveData();
-    });
-  }
-
-  daySelect.onchange = renderSchedule;
-  renderDays();
-      // Register Service Worker
-    if ("serviceWorker" in navigator) {
+}
+      if ("serviceWorker" in navigator) {
       navigator.serviceWorker.register("service-worker.js")
         .then(() => console.log("Service Worker registered"))
         .catch(err => console.error("SW registration failed:", err));
